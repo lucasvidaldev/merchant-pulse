@@ -6,12 +6,14 @@ export function getSupabaseClient() {
   if (supabaseClient) return supabaseClient
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabasePublishableKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+  const supabaseKey =
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
-  if (!supabaseUrl || !supabasePublishableKey) {
-    throw new Error('As variáveis públicas do Supabase não estão configuradas.')
+  if (!supabaseUrl || !supabaseKey) {
+    throw new Error('As variáveis públicas do Supabase não estão configuradas no .env.local.')
   }
 
-  supabaseClient = createClient(supabaseUrl, supabasePublishableKey)
+  supabaseClient = createClient(supabaseUrl, supabaseKey)
   return supabaseClient
 }

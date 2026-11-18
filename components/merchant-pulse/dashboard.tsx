@@ -1,8 +1,8 @@
 'use client'
 
 import Link from 'next/link'
-import { useState } from 'react'
-import { AlertTriangle, ArrowRight, CalendarDays, ChevronDown, Clock3, Ellipsis, MessageSquareText, Sparkles, Star, Store, Target, TrendingDown } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { AlertTriangle, ArrowRight, CalendarDays, Check, ChevronDown, Clock3, Ellipsis, MessageSquareText, Sparkles, Star, Store, Target, TrendingDown } from 'lucide-react'
 import { average, buildDailyMetrics, riskClass, riskLabel, useActionPlans, useMerchants, useRestaurantMetrics, useSlackNotifications } from '@/lib/merchant-data'
 import { filterByOperation } from '@/lib/operation-scope'
 import { useOperation } from './operation-context'
@@ -11,10 +11,28 @@ import { PageHeading } from './shell'
 import { QueryNotice } from './query-state'
 
 const number = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 1 })
+const periodOptions: Array<{ value: 7 | 30 | 90; label: string }> = [
+  { value: 7, label: 'Últimos 7 dias' },
+  { value: 30, label: 'Últimos 30 dias' },
+  { value: 90, label: 'Últimos 90 dias' },
+]
 
 export function Dashboard() {
   const { operation } = useOperation()
   const [periodDays, setPeriodDays] = useState<7 | 30 | 90>(30)
+  const [periodMenuOpen, setPeriodMenuOpen] = useState(false)
+  const periodMenuRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    function handleOutsideClick(event: MouseEvent) {
+      if (periodMenuRef.current && !periodMenuRef.current.contains(event.target as Node)) {
+        setPeriodMenuOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleOutsideClick)
+    return () => document.removeEventListener('mousedown', handleOutsideClick)
+  }, [])
+
   const merchantsQuery = useMerchants()
   const metricsQuery = useRestaurantMetrics(undefined, periodDays)
   const notificationsQuery = useSlackNotifications()
@@ -50,9 +68,86 @@ export function Dashboard() {
   ]
   const cancellationAverage = average(chartData.map((metric) => metric.cancelamento))
   const prepAverage = average(chartData.map((metric) => metric.preparo))
+  const currentPeriodLabel = periodOptions.find((opt) => opt.value === periodDays)?.label ?? 'Últimos 30 dias'
 
   return <>
-    <PageHeading eyebrow="DADOS DO SUPABASE" title="Visão geral" description="Acompanhe a saúde da sua carteira e antecipe riscos de churn." action={<label className="filter-select period-select"><CalendarDays size={14} /><span className="sr-only">Filtro de período</span><select aria-label="Período das métricas" value={periodDays} onChange={(event) => setPeriodDays(Number(event.target.value) as 7 | 30 | 90)}><option value={7}>Últimos 7 dias</option><option value={30}>Últimos 30 dias</option><option value={90}>Últimos 90 dias</option></select><ChevronDown size={13} /></label>} />
+    <PageHeading
+      eyebrow="DADOS DO SUPABASE"
+      title="Visão geral"
+      description="Acompanhe a saúde da sua carteira e antecipe riscos de churn."
+      action={
+        <div ref={periodMenuRef} style={{ position: 'relative' }}>
+          <button
+            type="button"
+            className="button-secondary button-compact"
+            aria-expanded={periodMenuOpen}
+            aria-label="Selecionar período das métricas"
+            onClick={() => setPeriodMenuOpen((prev) => !prev)}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}
+          >
+            <CalendarDays size={14} />
+            <span>{currentPeriodLabel}</span>
+            <ChevronDown
+              size={13}
+              style={{
+                transition: 'transform 180ms ease',
+                transform: periodMenuOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+              }}
+            />
+          </button>
+
+          {periodMenuOpen && (
+            <div
+              role="menu"
+              style={{
+                position: 'absolute',
+                top: 'calc(100% + 6px)',
+                right: 0,
+                minWidth: '185px',
+                zIndex: 40,
+                background: '#0f172a',
+                border: '1px solid rgba(148, 163, 184, 0.18)',
+                borderRadius: '12px',
+                padding: '6px',
+                boxShadow: '0 16px 32px rgba(0, 0, 0, 0.45)',
+              }}
+            >
+              {periodOptions.map((option) => {
+                const selected = option.value === periodDays
+                return (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => {
+                      setPeriodDays(option.value)
+                      setPeriodMenuOpen(false)
+                    }}
+                    style={{
+                      width: '100%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '8px 10px',
+                      borderRadius: '8px',
+                      border: 'none',
+                      background: selected ? 'rgba(59, 130, 246, 0.14)' : 'transparent',
+                      color: selected ? '#f8fafc' : '#cbd5e1',
+                      fontSize: '0.82rem',
+                      fontWeight: selected ? 600 : 400,
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                    }}
+                  >
+                    <span>{option.label}</span>
+                    {selected && <Check size={14} style={{ color: '#3b82f6' }} />}
+                  </button>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      }
+    />
     {error && <QueryNotice loading={false} error={error} />}
     {!loading && !error && merchantsQuery.data?.length === 0 && <QueryNotice loading={false} empty emptyMessage="Nenhum restaurante retornado. Verifique os dados e as políticas RLS do Supabase." />}
     <section className="welcome-strip"><div className="welcome-icon"><Sparkles size={18} /></div><div><strong>O pulso da sua carteira, em tempo real.</strong><p>{loading ? 'Consultando merchants e indicadores...' : error ? 'Os dados ainda não estão disponíveis nesta sessão.' : !merchants.length ? 'Nenhum merchant foi retornado pelas consultas atuais.' : `${atRisk} merchants precisam de atenção com base no diagnóstico de risco.`}</p></div><Link href="/copilot" className="welcome-action">Ver resumo com IA <ArrowRight size={14} /></Link></section>

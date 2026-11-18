@@ -2,11 +2,11 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { useState } from 'react'
-import { Activity, BarChart3, Bell, CalendarDays, ChevronDown, ChevronLeft, ChevronRight, CircleHelp, Command, LayoutDashboard, Menu, Search, Settings2, ShieldAlert, Sparkles, Store, Target, X } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { Activity, BarChart3, Bell, Check, ChevronDown, ChevronLeft, ChevronRight, CircleHelp, Command, LayoutDashboard, Menu, Search, Settings2, ShieldAlert, Sparkles, Store, Target, X } from 'lucide-react'
 import { ProfileMenu } from './profile-menu'
 import { useOperation } from './operation-context'
-import type { OperationScope } from '@/lib/operation-scope'
+import { operationLabel, type OperationScope } from '@/lib/operation-scope'
 
 const navigation = [
   { label: 'Visão geral', href: '/', icon: LayoutDashboard },
@@ -16,6 +16,12 @@ const navigation = [
   { label: 'Copiloto IA', href: '/copilot', icon: Sparkles },
   { label: 'Notificações', href: '/notifications', icon: Bell },
   { label: 'Planos de ação', href: '/actions', icon: Target },
+]
+
+const operationOptions: Array<{ value: OperationScope; label: string; subtitle: string }> = [
+  { value: 'brasil', label: 'Operação Brasil', subtitle: 'Todas as unidades' },
+  { value: 'sudeste', label: 'Operação Sudeste', subtitle: 'SP, RJ, MG e ES' },
+  { value: 'sul', label: 'Operação Sul', subtitle: 'PR, SC e RS' },
 ]
 
 const pageNames: Record<string, string> = {
@@ -28,21 +34,149 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const { operation, setOperation } = useOperation()
   const [mobileOpen, setMobileOpen] = useState(false)
   const [collapsed, setCollapsed] = useState(false)
+  const [opMenuOpen, setOpMenuOpen] = useState(false)
+  const opMenuRef = useRef<HTMLDivElement>(null)
+
   const currentPath = pathname.startsWith('/restaurants/') ? '/restaurants' : pathname
   const title = pageNames[currentPath] ?? 'Restaurante'
+
+  useEffect(() => {
+    function handleOutsideClick(event: MouseEvent) {
+      if (opMenuRef.current && !opMenuRef.current.contains(event.target as Node)) {
+        setOpMenuOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleOutsideClick)
+    return () => document.removeEventListener('mousedown', handleOutsideClick)
+  }, [])
 
   return (
     <div className="app-frame">
       {mobileOpen && <button aria-label="Fechar menu" className="mobile-scrim" onClick={() => setMobileOpen(false)} />}
       <aside className={`sidebar ${collapsed ? 'sidebar-collapsed' : ''} ${mobileOpen ? 'sidebar-mobile-open' : ''}`}>
         <div className="brand-row">
-          <Link className="brand-mark" href="/" aria-label="Merchant Pulse — início"><Activity size={19} strokeWidth={2.5} /></Link>
+          {collapsed ? (
+            <button
+              type="button"
+              className="brand-mark"
+              aria-label="Expandir menu lateral"
+              title="Expandir menu"
+              onClick={() => setCollapsed(false)}
+              style={{ cursor: 'pointer', border: 'none' }}
+            >
+              <Activity size={19} strokeWidth={2.5} />
+            </button>
+          ) : (
+            <Link className="brand-mark" href="/" aria-label="Merchant Pulse — início">
+              <Activity size={19} strokeWidth={2.5} />
+            </Link>
+          )}
           {!collapsed && <Link href="/" className="brand-name">merchant<span>pulse</span></Link>}
-          <button className="icon-button collapse-button" aria-label={collapsed ? 'Expandir menu' : 'Recolher menu'} onClick={() => setCollapsed(!collapsed)}>{collapsed ? <ChevronRight size={15} /> : <ChevronLeft size={15} />}</button>
+          {!collapsed && (
+            <button
+              className="icon-button collapse-button"
+              aria-label="Recolher menu"
+              onClick={() => setCollapsed(true)}
+            >
+              <ChevronLeft size={15} />
+            </button>
+          )}
           <button className="icon-button mobile-close" aria-label="Fechar menu" onClick={() => setMobileOpen(false)}><X size={17} /></button>
         </div>
-        {!collapsed && <div className="workspace-switch"><div className="workspace-avatar">MP</div><label className="workspace-copy"><span className="sr-only">Selecionar operação</span><select aria-label="Selecionar operação" value={operation} onChange={(event) => setOperation(event.target.value as OperationScope)}><option value="brasil">Operação Brasil</option><option value="sudeste">Operação Sudeste</option><option value="sul">Operação Sul</option></select><span>Unidade operacional</span></label><ChevronDown size={14} className="muted-icon" /></div>}
-        {collapsed && <div className="workspace-avatar workspace-avatar-collapsed">MP</div>}
+
+        {!collapsed ? (
+          <div ref={opMenuRef} style={{ position: 'relative' }}>
+            <button
+              type="button"
+              className="workspace-switch"
+              aria-expanded={opMenuOpen}
+              aria-label="Selecionar operação"
+              onClick={() => setOpMenuOpen((prev) => !prev)}
+              style={{ width: '100%', textAlign: 'left', cursor: 'pointer' }}
+            >
+              <div className="workspace-avatar">MP</div>
+              <div className="workspace-copy">
+                <strong style={{ display: 'block', fontSize: '0.84rem', color: 'var(--text-primary, #f8fafc)', fontWeight: 600 }}>
+                  {operationLabel(operation)}
+                </strong>
+                <span>Unidade operacional</span>
+              </div>
+              <ChevronDown
+                size={14}
+                className="muted-icon"
+                style={{
+                  transition: 'transform 180ms ease',
+                  transform: opMenuOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+                }}
+              />
+            </button>
+
+            {opMenuOpen && (
+              <div
+                role="menu"
+                style={{
+                  position: 'absolute',
+                  top: 'calc(100% + 6px)',
+                  left: 0,
+                  right: 0,
+                  zIndex: 50,
+                  background: '#0f172a',
+                  border: '1px solid rgba(148, 163, 184, 0.18)',
+                  borderRadius: '12px',
+                  padding: '6px',
+                  boxShadow: '0 16px 32px rgba(0, 0, 0, 0.45)',
+                }}
+              >
+                {operationOptions.map((opt) => {
+                  const selected = opt.value === operation
+                  return (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      role="menuitemradio"
+                      aria-checked={selected}
+                      onClick={() => {
+                        setOperation(opt.value)
+                        setOpMenuOpen(false)
+                      }}
+                      style={{
+                        width: '100%',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: '8px',
+                        padding: '8px 10px',
+                        borderRadius: '8px',
+                        border: 'none',
+                        background: selected ? 'rgba(59, 130, 246, 0.14)' : 'transparent',
+                        color: selected ? '#f8fafc' : '#cbd5e1',
+                        cursor: 'pointer',
+                        textAlign: 'left',
+                      }}
+                    >
+                      <div>
+                        <div style={{ fontSize: '0.82rem', fontWeight: 600 }}>{opt.label}</div>
+                        <div style={{ fontSize: '0.72rem', color: '#94a3b8' }}>{opt.subtitle}</div>
+                      </div>
+                      {selected && <Check size={14} style={{ color: '#3b82f6', flexShrink: 0 }} />}
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        ) : (
+          <button
+            type="button"
+            className="workspace-avatar workspace-avatar-collapsed"
+            title={`${operationLabel(operation)} (clique para expandir)`}
+            onClick={() => setCollapsed(false)}
+            style={{ border: 'none', cursor: 'pointer' }}
+          >
+            MP
+          </button>
+        )}
+
         {!collapsed && <div className="nav-section-label">WORKSPACE</div>}
         <nav className="primary-nav" aria-label="Navegação principal">
           {navigation.map(({ label, href, icon: Icon }) => {
