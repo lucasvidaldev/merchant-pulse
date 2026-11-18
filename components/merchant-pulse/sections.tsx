@@ -401,8 +401,8 @@ export function SettingsPage() {
             <div className="integration-warning"><Zap size={15} /><div><strong>Schema Merchant Pulse conectado</strong><span>As consultas usam merchants, daily_metrics, ai_diagnoses, action_plans e slack_notifications via RLS público de leitura/atualização.</span></div></div>
             <div className="integration-item">
               <span className="integration-logo n8n-logo">n8n</span>
+              <div className="integration-copy"><strong>n8n</strong><span>Automação de fluxos e ingestão de dados</span></div>
               <span className="integration-status status-connected"><i />Conectado</span>
-              <span className="integration-status status-disconnected"><i />Pronto para fluxo</span>
               <button type="button" className="integration-action" onClick={() => setShowN8nGuide((prev) => !prev)}>
                 {showN8nGuide ? 'Ocultar' : 'Configurar'}
               </button>
